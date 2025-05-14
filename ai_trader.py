@@ -1,5 +1,3 @@
-# Modified script using pandas-ta instead of TA-Lib with Telegram alerting
-
 import requests
 import pandas as pd
 import yfinance as yf
@@ -8,11 +6,9 @@ from tqdm import tqdm
 import pandas_ta as ta
 import os
 from dotenv import load_dotenv
-import certifi
-os.environ["SSL_CERT_FILE"] = certifi.where()
+
 load_dotenv()
 
-# Telegram credentials from .env file
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
@@ -37,8 +33,19 @@ def fetch_nse_stocks():
     return nse_stocks
 
 def get_history_data(symbol):
-    data = yf.download(symbol, start="2022-01-01", end="2024-12-31", progress=False)
-    return data
+    try:
+        data = yf.download(symbol, start="2022-01-01", end="2024-12-31", progress=False)
+
+        # Flatten MultiIndex columns if present
+        if isinstance(data.columns, pd.MultiIndex):
+            data.columns = [' '.join(col).strip() for col in data.columns.values]
+
+        # Ensure standard column names
+        data = data.rename(columns=lambda x: x.capitalize())
+        return data
+    except Exception as e:
+        print(f"⚠️ Failed to get ticker '{symbol}': {e}")
+        return pd.DataFrame()
 
 def pattern_analysis(symbol):
     print(f"------------ Pattern analysis for symbol: {symbol} -----------------", end="\n")
@@ -48,6 +55,11 @@ def pattern_analysis(symbol):
         print("Insufficient data for analysis: expected at least 90 days of data.")
         return None
 
+    required_cols = ["Open", "High", "Low", "Close", "Volume"]
+    if not all(col in hist_data.columns for col in required_cols):
+        print(f"⚠️ {symbol} missing required columns. Skipping.")
+        return None
+
     patterns_recognised = []
     rsi_trend = ""
     macd_trend = ""
@@ -55,14 +67,12 @@ def pattern_analysis(symbol):
     wma_value = 0.0
     obv_value = 0.0
 
-    # Calculate indicators using pandas-ta
     hist_data.ta.rsi(length=14, append=True)
     hist_data.ta.macd(append=True)
     hist_data.ta.sma(length=14, append=True)
     hist_data.ta.wma(length=14, append=True)
     hist_data.ta.obv(append=True)
 
-    # Extract trends and latest values
     rsi = hist_data['RSI_14']
     macd = hist_data['MACD_12_26_9']
     macd_signal = hist_data['MACDs_12_26_9']
@@ -88,14 +98,11 @@ def pattern_analysis(symbol):
 
     if not sma.empty:
         sma_value = sma.iloc[-1]
-
     if not wma.empty:
         wma_value = wma.iloc[-1]
-
     if not obv.empty:
         obv_value = obv.iloc[-1]
 
-    # Generate and send Telegram alert
     alert_msg = f"📈 {symbol}\nRSI: {rsi_trend}, MACD: {macd_trend}\nSMA: {sma_value:.2f}, WMA: {wma_value:.2f}, OBV: {obv_value:.2f}"
     if rsi_trend != "Sideways" or macd_trend != "Sideways":
         send_telegram_alert(alert_msg)

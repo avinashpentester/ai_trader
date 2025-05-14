@@ -40,9 +40,17 @@ def send_telegram_alert(message):
 def get_history_data(symbol):
     try:
         data = yf.download(symbol, start="2022-01-01", end="2024-12-31", progress=False)
+
         if isinstance(data.columns, pd.MultiIndex):
             data.columns = [' '.join(col).strip() for col in data.columns.values]
-        data = data.rename(columns=lambda x: x.capitalize())
+
+        # Normalize and strip column names
+        rename_map = {col: col.strip().capitalize() for col in data.columns}
+        data = data.rename(columns=rename_map)
+
+        data = data.dropna()
+        print("Columns:", list(data.columns))
+
         return data
     except Exception as e:
         print(f"⚠️ Failed to get ticker '{symbol}': {e}")
@@ -58,7 +66,8 @@ def pattern_analysis(symbol):
 
     required_cols = ["Open", "High", "Low", "Close", "Volume"]
     if not all(col in hist_data.columns for col in required_cols):
-        print(f"⚠️ {symbol} missing required columns. Skipping.")
+        missing = [col for col in required_cols if col not in hist_data.columns]
+        print(f"⚠️ {symbol} missing columns: {missing}. Skipping.")
         return None
 
     patterns_recognised = []

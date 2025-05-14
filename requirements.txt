@@ -17,6 +17,7 @@ python-dateutil==2.9.0.post0
 python-dotenv==1.1.0
 pytz==2025.2
 requests==2.32.3
+setuptools>=65.5.0
 six==1.17.0
 soupsieve==2.7
 tqdm==4.67.1

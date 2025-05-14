@@ -12,6 +12,19 @@ load_dotenv()
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
+NIFTY_50_SYMBOLS = [
+    "RELIANCE.NS", "TCS.NS", "INFY.NS", "HDFCBANK.NS", "ICICIBANK.NS",
+    "HINDUNILVR.NS", "KOTAKBANK.NS", "ITC.NS", "SBIN.NS", "LT.NS",
+    "AXISBANK.NS", "BAJFINANCE.NS", "BHARTIARTL.NS", "ASIANPAINT.NS", "MARUTI.NS",
+    "SUNPHARMA.NS", "WIPRO.NS", "ULTRACEMCO.NS", "HCLTECH.NS", "DIVISLAB.NS",
+    "TITAN.NS", "GRASIM.NS", "ADANIENT.NS", "ADANIPORTS.NS", "COALINDIA.NS",
+    "JSWSTEEL.NS", "NTPC.NS", "POWERGRID.NS", "TATASTEEL.NS", "TECHM.NS",
+    "DRREDDY.NS", "NESTLEIND.NS", "HDFCLIFE.NS", "SBILIFE.NS", "BRITANNIA.NS",
+    "BAJAJ-AUTO.NS", "HEROMOTOCO.NS", "EICHERMOT.NS", "CIPLA.NS", "BAJAJFINSV.NS",
+    "HINDALCO.NS", "ONGC.NS", "BPCL.NS", "UPL.NS", "SHREECEM.NS",
+    "TATAMOTORS.NS", "INDUSINDBK.NS", "M&M.NS", "IOC.NS", "LTIM.NS"
+]
+
 def send_telegram_alert(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
@@ -24,23 +37,11 @@ def send_telegram_alert(message):
     except Exception as e:
         print(f"❌ Telegram alert failed: {e}")
 
-def fetch_nse_stocks():
-    response = requests.get('https://api.kite.trade/instruments')
-    stocks = pd.DataFrame([line.split(',') for line in response.text.split('\n')])
-    stocks.columns = stocks.iloc[0]
-    stocks = stocks[1:]
-    nse_stocks = stocks[stocks.segment == 'NSE']
-    return nse_stocks
-
 def get_history_data(symbol):
     try:
         data = yf.download(symbol, start="2022-01-01", end="2024-12-31", progress=False)
-
-        # Flatten MultiIndex columns if present
         if isinstance(data.columns, pd.MultiIndex):
             data.columns = [' '.join(col).strip() for col in data.columns.values]
-
-        # Ensure standard column names
         data = data.rename(columns=lambda x: x.capitalize())
         return data
     except Exception as e:
@@ -110,14 +111,10 @@ def pattern_analysis(symbol):
     return [symbol, patterns_recognised, rsi_trend, macd_trend, sma_value, wma_value, obv_value]
 
 def main():
-    nse_stocks = fetch_nse_stocks()
-    print("NSE Stocks size:", nse_stocks.shape[0])
+    print("Nifty 50 selected stocks:", len(NIFTY_50_SYMBOLS))
 
     data_list = []
-    for index, row in tqdm(nse_stocks.iterrows(), total=nse_stocks.shape[0]):
-        if row['tradingsymbol'].endswith("-SG"):
-            continue
-        symbol = row['tradingsymbol'] + ".NS"
+    for symbol in tqdm(NIFTY_50_SYMBOLS):
         analysis_result = pattern_analysis(symbol)
         if analysis_result:
             data_list.append(analysis_result)
